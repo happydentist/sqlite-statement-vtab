@@ -1,10 +1,6 @@
 name: Build Windows DLL
 
 on:
-  push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
@@ -12,39 +8,33 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    # 1. 檢出當前擴充套件的原始碼
+    # 1. 檢出當前 0x09/sqlite-statement-vtab 的原始碼
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # 2. 設定 MSVC 開發人員命令提示字元環境（x64）
+    # 2. 設定 MSVC x64 編譯環境
     - name: Set up MSVC x64
       uses: ilammy/msvc-dev-cmd@v1
       with:
         arch: amd64
 
-    # 3. 正確下載並解壓縮 SQLite 標頭檔 (amalgamation)
-    - name: Download SQLite source headers
+    # 3. 透過 Git 直接獲取 SQLite 官方標頭檔（免除 Invoke-WebRequest 下載出錯的風險）
+    - name: Get SQLite Headers via Git
       shell: powershell
       run: |
-        # 使用 SQLite 官方正確的原始碼 ZIP 檔案網址
-        $sqlite_url = "https://sqlite.org"
-        Invoke-WebRequest -Uri $sqlite_url -OutFile "sqlite.zip"
-        Expand-Archive -Path "sqlite.zip" -DestinationPath "sqlite_src"
-        
-        # 將解壓出來的 sqlite3.h 與 sqlite3ext.h 移到當前工作目錄
-        Move-Item -Path "sqlite_src\sqlite-amalgamation-*\*" -Destination .
+        git clone --depth 1 https://github.com sqlite_repo
+        Copy-Item -Path "sqlite_repo\src\sqlite3ext.h" -Destination "."
+        Copy-Item -Path "sqlite_repo\src\sqlite3.h" -Destination "."
 
-    # 4. 使用 CL 編譯器將 C 原始碼編譯為 DLL
+    # 4. 使用微軟 CL 編譯器編譯符合 Windows 規範的 DLL
     - name: Build DLL with MSVC
       shell: cmd
       run: |
-        cl /O2 /LD statement_vtab.c /I. /Fe:statement_vtab.dll
+        cl /O2 /LD /D_USRDLL /D_WINDLL statement_vtab.c /I. /Fe:statement_vtab.dll
 
-    # 5. 上傳編譯好的 DLL 作為 Artifacts 供下載
+    # 5. 打包上傳產出的 DLL
     - name: Upload Build Artifact
       uses: actions/upload-artifact@v4
       with:
         name: sqlite-statement-vtab-windows-x64
         path: statement_vtab.dll
-
-
