@@ -1,0 +1,55 @@
+name: Build Windows DLL
+
+on:
+  workflow_dispatch: # 允許手動觸發
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    strategy:
+      matrix:
+        # 同時編譯 64 位元與 32 位元版本
+        include:
+          - sys: mingw64
+            arch: x86_64
+          - sys: mingw32
+            arch: i686
+
+    steps:
+    # 1. 複製目前的原始碼
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # 2. 設定 MSYS2 環境與 GCC 編譯器
+    - name: Setup MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: ${{ matrix.sys }}
+        update: true
+        install: >-
+          mingw-w64-${{ matrix.arch }}-gcc
+          wget
+          unzip
+
+    # 3. 下載 SQLite 標頭檔 (自動獲取官網最新版代碼)
+    - name: Download SQLite headers
+      shell: msys2 {0}
+      run: |
+        # 下載 2026年最新版本的 sqlite-amalgamation
+        wget https://sqlite.org -O sqlite.zip
+        unzip sqlite.zip
+        cp sqlite-amalgamation-*/sqlite3*.h .
+
+    # 4. 執行編譯
+    - name: Build DLL
+      shell: msys2 {0}
+      run: |
+        gcc -g -O2 -shared -I. statement_vtab.c -o statement_vtab_${{ matrix.arch }}.dll
+
+    # 5. 將編譯好的 DLL 上傳為 Artifact 供下載
+    - name: Upload Artifact
+      uses: actions/artifacts@v4
+      with:
+        name: sqlite-statement-vtab-windows-${{ matrix.arch }}
+        path: statement_vtab_${{ matrix.arch }}.dll
