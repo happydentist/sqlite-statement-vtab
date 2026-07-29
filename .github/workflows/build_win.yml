@@ -1,6 +1,10 @@
 name: Build Windows DLL
 
 on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
@@ -18,7 +22,7 @@ jobs:
       with:
         arch: amd64
 
-    # 3. 使用虛擬機內建的 vcpkg 極速安裝 sqlite3 標頭檔與庫
+    # 3. 使用 vcpkg 安裝 sqlite3 標頭檔與程式庫
     - name: Install SQLite3 via vcpkg
       shell: cmd
       run: |
@@ -40,11 +44,11 @@ jobs:
         "@
         Set-Content -Path "sqlite3ext.h" -Value $macro_content
 
-    # 5. 使用微軟 CL 編譯器編譯 Windows DLL（引入 vcpkg 包含路徑）
+    # 5. 使用微軟 CL 編编译 Windows DLL（補上巨集與靜態連結庫路徑）
     - name: Build DLL with MSVC
       shell: cmd
       run: |
-        cl /O2 /LD /D_USRDLL /D_WINDLL statement_vtab.c /I. /I"C:\vcpkg\installed\x64-windows\include" /Fe:statement_vtab.dll
+        cl /O2 /LD /D_USRDLL /D_WINDLL /DSQLITE_CORE statement_vtab.c /I. /I"C:\vcpkg\installed\x64-windows\include" /link /LIBPATH:"C:\vcpkg\installed\x64-windows\lib" sqlite3.lib /Fe:statement_vtab.dll
 
     # 6. 上傳編譯產物
     - name: Upload Build Artifact
@@ -52,5 +56,3 @@ jobs:
       with:
         name: sqlite-statement-vtab-windows-x64
         path: statement_vtab.dll
-
-
