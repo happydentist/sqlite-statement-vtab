@@ -1,7 +1,11 @@
 name: Build Windows DLL
 
 on:
-  workflow_dispatch: # 允許手動觸發
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
 
 jobs:
   build-windows:
@@ -18,15 +22,16 @@ jobs:
       with:
         arch: amd64
 
-    # 3. 下載並解壓縮 SQLite 標頭檔 (包含 sqlite3.h 與 sqlite3ext.h)
+    # 3. 正確下載並解壓縮 SQLite 標頭檔 (amalgamation)
     - name: Download SQLite source headers
       shell: powershell
       run: |
-        # 使用 2026 最新穩定版本（或依需求調整 URL 的版本號）
+        # 使用 SQLite 官方正確的原始碼 ZIP 檔案網址
         $sqlite_url = "https://sqlite.org"
         Invoke-WebRequest -Uri $sqlite_url -OutFile "sqlite.zip"
         Expand-Archive -Path "sqlite.zip" -DestinationPath "sqlite_src"
-        # 將解壓出來的標頭檔移到當前目錄
+        
+        # 將解壓出來的 sqlite3.h 與 sqlite3ext.h 移到當前工作目錄
         Move-Item -Path "sqlite_src\sqlite-amalgamation-*\*" -Destination .
 
     # 4. 使用 CL 編譯器將 C 原始碼編譯為 DLL
@@ -34,11 +39,6 @@ jobs:
       shell: cmd
       run: |
         cl /O2 /LD statement_vtab.c /I. /Fe:statement_vtab.dll
-      # 參數說明：
-      # /O2 : 優化執行速度
-      # /LD : 編譯為動態連結庫 (DLL)
-      # /I. : 將目前目錄（有 sqlite3.h）加入標頭檔搜尋路徑
-      # /Fe: : 指定輸出的檔名
 
     # 5. 上傳編譯好的 DLL 作為 Artifacts 供下載
     - name: Upload Build Artifact
@@ -46,4 +46,5 @@ jobs:
       with:
         name: sqlite-statement-vtab-windows-x64
         path: statement_vtab.dll
+
 
