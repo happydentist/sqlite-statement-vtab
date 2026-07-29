@@ -8,37 +8,27 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    # 1. 檢出當前擴充套件的原始碼
+    # 1. 檢出您的 0x09/sqlite-statement-vtab 原始碼
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # 2. 設定 MSVC 開發人員命令提示字元環境（x64）
+    # 2. 設定 MSVC 開發人員環境（這會自動把 Windows SDK 標頭檔路徑加入環境變數）
     - name: Set up MSVC x64
       uses: ilammy/msvc-dev-cmd@v1
       with:
         arch: amd64
 
-    # 3. 穩定地下載並解壓縮 SQLite 標頭檔 (使用 2026 最新發布的 3.53.4 版本網址)
-    - name: Download SQLite source headers
-      shell: powershell
-      run: |
-        $sqlite_url = "https://sqlite.org"
-        Invoke-WebRequest -Uri $sqlite_url -OutFile "sqlite.zip"
-        Expand-Archive -Path "sqlite.zip" -DestinationPath "sqlite_src"
-        
-        # 移出解壓資料夾內的所有標頭檔至當前工作目錄
-        Get-ChildItem -Path "sqlite_src\sqlite-amalgamation-*\*" | Move-Item -Destination .
-
-    # 4. 使用 CL 編譯器將 C 原始碼編譯為 Windows DLL
+    # 3. 直接編譯（使用系統內建的 SQLite 標頭檔，完全不需要手動下載）
     - name: Build DLL with MSVC
       shell: cmd
       run: |
-        cl /O2 /LD /D_USRDLL /D_WINDLL statement_vtab.c /I. /Fe:statement_vtab.dll
+        cl /O2 /LD /D_USRDLL /D_WINDLL statement_vtab.c /Fe:statement_vtab.dll
 
-    # 5. 上傳編譯好的 DLL 作為 Artifacts 供下載
+    # 4. 上傳編譯好的 DLL
     - name: Upload Build Artifact
       uses: actions/upload-artifact@v4
       with:
         name: sqlite-statement-vtab-windows-x64
         path: statement_vtab.dll
+
 
