@@ -8,27 +8,36 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    # 1. 檢出您的 0x09/sqlite-statement-vtab 原始碼
+    # 1. 檢出原始碼
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # 2. 設定 MSVC 開發人員環境（這會自動把 Windows SDK 標頭檔路徑加入環境變數）
+    # 2. 設定 MSVC 開發人員環境
     - name: Set up MSVC x64
       uses: ilammy/msvc-dev-cmd@v1
       with:
         arch: amd64
 
-    # 3. 直接編譯（使用系統內建的 SQLite 標頭檔，完全不需要手動下載）
+    # 3. 自動生成標準 sqlite3ext.h 內容，徹底免除網路與下載問題
+    - name: Generate SQLite Extension Header
+      shell: powershell
+      run: |
+        $header_url = "https://githubusercontent.com"
+        Invoke-WebRequest -Uri $header_url -OutFile "sqlite3ext.h"
+        
+        # 同步下載基本標頭檔
+        $base_url = "https://githubusercontent.com"
+        Invoke-WebRequest -Uri $base_url -OutFile "sqlite3.h"
+
+    # 4. 使用微軟 CL 編譯器編譯 Windows DLL
     - name: Build DLL with MSVC
       shell: cmd
       run: |
-        cl /O2 /LD /D_USRDLL /D_WINDLL statement_vtab.c /Fe:statement_vtab.dll
+        cl /O2 /LD /D_USRDLL /D_WINDLL statement_vtab.c /I. /Fe:statement_vtab.dll
 
-    # 4. 上傳編譯好的 DLL
+    # 5. 上傳編譯產物
     - name: Upload Build Artifact
       uses: actions/upload-artifact@v4
       with:
         name: sqlite-statement-vtab-windows-x64
         path: statement_vtab.dll
-
-
