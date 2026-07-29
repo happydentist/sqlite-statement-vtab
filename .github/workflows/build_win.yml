@@ -8,7 +8,7 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    # 1. 檢出原始碼
+    # 1. 檢出您的 0x09/sqlite-statement-vtab 原始碼
     - name: Checkout repository
       uses: actions/checkout@v4
 
@@ -18,16 +18,21 @@ jobs:
       with:
         arch: amd64
 
-    # 3. 自動生成標準 sqlite3ext.h 內容，徹底免除網路與下載問題
-    - name: Generate SQLite Extension Header
+    # 3. 在本地直接生成最基礎的 sqlite3ext.h，完全不需要依賴網路下載
+    - name: Generate SQLite Extension Stubs
       shell: powershell
       run: |
-        $header_url = "https://githubusercontent.com"
-        Invoke-WebRequest -Uri $header_url -OutFile "sqlite3ext.h"
-        
-        # 同步下載基本標頭檔
-        $base_url = "https://githubusercontent.com"
-        Invoke-WebRequest -Uri $base_url -OutFile "sqlite3.h"
+        $macro_content = @"
+        #ifndef _SQLITE3EXT_H_
+        #define _SQLITE3EXT_H_
+        #include <sqlite3.h>
+        #ifndef SQLITE_EXTENSION_INIT1
+        #define SQLITE_EXTENSION_INIT1     const sqlite3_api_routines *sqlite3_api = 0;
+        #define SQLITE_EXTENSION_INIT2(v)  sqlite3_api = v;
+        #endif
+        #endif
+        "@
+        Set-Content -Path "sqlite3ext.h" -Value $macro_content
 
     # 4. 使用微軟 CL 編譯器編譯 Windows DLL
     - name: Build DLL with MSVC
@@ -41,3 +46,4 @@ jobs:
       with:
         name: sqlite-statement-vtab-windows-x64
         path: statement_vtab.dll
+
